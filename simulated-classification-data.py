@@ -18,7 +18,7 @@ from sklearn.decomposition import PCA
 import time
 
 
-# Dataset: Binary class
+# Dataset: Create a data set with Binary class
 class_data = make_classification(
     n_samples = 10000,
     n_features = 50,
@@ -56,7 +56,7 @@ def modelBake(_lower,_upper,_step,logreg=True,cart=True,rf=True,xgboost=True,nn=
     n = len(class_data[0])
     X = class_data[0]
     y = class_data[1]
-    X_training, X_test, y_training, y_test = train_test_split(X, y, test_size=100, random_state=100)
+    X_training, X_test, y_training, y_test = train_test_split(X, y, test_size=500, random_state=100)
 
 
     for i in np.arange(_lower, _upper + _step, _step):
@@ -159,87 +159,16 @@ def modelBake(_lower,_upper,_step,logreg=True,cart=True,rf=True,xgboost=True,nn=
 
 model_accuracies = modelBake(1000,9000,100)
 
-model_accuracies['logreg'][-1]
-model_accuracies['cart'][-1]
-model_accuracies['rf'][-1]
-model_accuracies['xgboost'][-1]
-model_accuracies['nn'][-1]
+print('Model Accuracies')
+print('-----------------')
+print('Logistic Regression: {:.2f}'.format(model_accuracies['logreg'][-1]))
+print('CART: {:.2f}'.format(model_accuracies['cart'][-1]))
+print('Random Forest: {:.2f}'.format(model_accuracies['rf'][-1]))
+print('XGBoost: {:.2f}'.format(model_accuracies['xgboost'][-1]))
+print('Neural Net: {:.2f}'.format(model_accuracies['nn'][-1]))
 
 plt.plot(model_accuracies['logreg_runtime'], label='logreg')
 plt.plot(model_accuracies['cart_runtime'], label='cart')
 plt.plot(model_accuracies['rf_runtime'], label='rf')
 plt.plot(model_accuracies['xgboost_runtime'], label='xgboost')
 plt.plot(model_accuracies['nn_runtime'], label='nn')
-
-
-
-
-
-
-# Dataset: Random number of features
-datalist = {}
-for n in range(50,510,10):
-    class_data = make_classification(
-        n_samples = 1000,
-        n_features = n,
-        n_informative = 10,
-        n_redundant = 2,
-        class_sep = 2,
-        flip_y = 0.1,
-        weights=[0.5,0.5],
-        random_state = 100)
-    datalist.update({n: class_data})
-
-
-logreg_scores = {}
-cart_scores = {}
-rf_scores = {}
-xg_scores = {}
-nn_scores = {}
-for key, value in datalist.items():
-    n = key
-    X = datalist[key][0]
-    y = datalist[key][1]
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=200, random_state=100)
-
-    # Logit model -----
-    logreg = LogisticRegression(solver='lbfgs', max_iter=1000)
-    logreg.fit(X_train, y_train)
-    score_logit = logreg.score(X_test, y_test)
-    logreg_scores.update({n: score_logit})
-
-    # CART model -----
-    cart_tree = tree.DecisionTreeClassifier(random_state=100)
-    cart_tree.fit(X_train, y_train)
-    score_cart = cart_tree.score(X_test, y_test)
-    cart_scores.update({n: score_cart})
-
-    # Random Forest -----
-    forest = RandomForestClassifier(n_estimators = 100, max_features='auto', random_state=100)
-    forest.fit(X_train,y_train)
-    score_forest = forest.score(X_test, y_test)
-    rf_scores.update({n: score_forest})
-
-    # XGBoost -----
-    xgbooster = XGBClassifier(n_estimators=100,max_depth=4,random_state=100)
-    xgbooster.fit(X_train, y_train)
-    score_xgboost = xgbooster.score(X_test, y_test)
-    xg_scores.update({n: score_xgboost})
-
-    # Neural Net
-    nnet = MLPClassifier(solver='adam',
-                            hidden_layer_sizes=(5,5),
-                            max_iter = 500,
-                            early_stopping = True,
-                            random_state=100)
-
-    nnet.fit(X_train, y_train)
-    score_nnet = nnet.score(X_test, y_test)
-    nn_scores.update({n: score_nnet})
-
-plt.figure(figsize=(10,10))
-plt.plot(list(logreg_scores.keys()), list(logreg_scores.values()), label='logit')
-plt.plot(list(cart_scores.keys()), list(cart_scores.values()), label='CART')
-plt.plot(list(rf_scores.keys()), list(rf_scores.values()), label='RF')
-plt.plot(list(xg_scores.keys()), list(xg_scores.values()), label='XGBoost')
-plt.plot(list(nn_scores.keys()), list(nn_scores.values()), label='NN')
