@@ -38,26 +38,90 @@ plt.xlabel('component 1')
 plt.ylabel('component 2')
 plt.title('2-dimensional view of the data')
 
+# Helper: set up testing experiment for models
+def test_setup(_test_size, _data):
+    from sklearn.model_selection import train_test_split
+    # global X_training, X_test, y_training, y_test
+
+    # Set data set to use
+    class_data = _data
+
+    # Define outcome and predictors
+    X = class_data[0]
+    y = class_data[1]
+    X_training, X_test, y_training, y_test = train_test_split(X, y, test_size=_test_size, random_state=100)
+    TrainTestData = {
+        'X_training': X_training,
+        'y_training': y_training,
+        'X_test': X_test,
+        'y_test': y_test
+    }
+    return(TrainTestData)
 
 
-def modelBake(_lower,_upper,_step,logreg=True,cart=True,rf=True,xgboost=True,nn=True):
+# Helper: Build models
+def models(type='logreg', X=None, y=None, Xtest=None, ytest=None):
+
+    # Logistic Regression -----
+    if type == 'logreg':
+        logreg = LogisticRegression(solver='lbfgs', max_iter=1000)
+        logreg.fit(X, y)
+        score_logit = logreg.score(Xtest, ytest)
+        return(score_logit)
+
+    # CART -----
+    if type == 'cart':
+        cart_tree = tree.DecisionTreeClassifier(random_state=100)
+        cart_tree.fit(X, y)
+        score_cart = cart_tree.score(Xtest, ytest)
+        return(score_cart)
+
+    # Random Forest -----
+    if type =='rf':
+        forest = RandomForestClassifier(n_estimators = 100, max_features='auto', random_state=100)
+        forest.fit(X,y)
+        score_forest = forest.score(Xtest, ytest)
+        return(score_forest)
+
+    if type =='xgboost':
+        xgbooster = XGBClassifier(n_estimators=100, max_depth=4,random_state=100)
+        xgbooster.fit(X, y)
+        score_xgboost = xgbooster.score(Xtest, ytest)
+        return(score_xgboost)
+
+    if type =='nn':
+        nnet = MLPClassifier(solver='adam',
+                                hidden_layer_sizes=(5,5),
+                                max_iter = 500,
+                                early_stopping = True,
+                                random_state=100)
+
+        nnet.fit(X, y)
+        score_nnet = nnet.score(Xtest, ytest)
+        return(score_nnet)
+
+
+def modelBake(_lower,_upper,_step,data, test_size=0.2, logreg=True,cart=True,rf=True,xgboost=True,nn=True):
+
+    TrainTestData = test_setup(test_size, data)
+    X_training = TrainTestData['X_training']
+    y_training = TrainTestData['y_training']
+    X_test = TrainTestData['X_test']
+    y_test = TrainTestData['y_test']
+
+    # Initialize dictionaries for model scores
     logreg_scores = {}
     cart_scores = {}
     rf_scores = {}
     xg_scores = {}
     nn_scores = {}
 
+    # track runtimes
     logreg_runtime = []
     cart_runtime = []
     rf_runtime = []
     xgboost_runtime = []
     nn_runtime = []
-
-    n = len(class_data[0])
-    X = class_data[0]
-    y = class_data[1]
-    X_training, X_test, y_training, y_test = train_test_split(X, y, test_size=500, random_state=100)
-
 
     for i in np.arange(_lower, _upper + _step, _step):
 
@@ -71,60 +135,35 @@ def modelBake(_lower,_upper,_step,logreg=True,cart=True,rf=True,xgboost=True,nn=
         # Logistic Regression -----
         if logreg:
             start_time = time.time()
-            logreg = LogisticRegression(solver='lbfgs', max_iter=1000)
-            logreg.fit(X_train, y_train)
-            score_logit = logreg.score(X_test, y_test)
-            logreg_run = {n: score_logit}
-            logreg_scores.update(logreg_run)
+            logreg_scores.update({n: models('logreg', X=X_train, y=y_train, Xtest=X_test, ytest=y_test)})
             timer = time.time() - start_time
             logreg_runtime.append(timer)
 
         # CART -----
         if cart:
             start_time = time.time()
-            cart_tree = tree.DecisionTreeClassifier(random_state=100)
-            cart_tree.fit(X_train, y_train)
-            score_cart = cart_tree.score(X_test, y_test)
-            cart_run = {n: score_cart}
-            cart_scores.update(cart_run)
+            cart_scores.update({n: models('cart', X=X_train, y=y_train, Xtest=X_test, ytest=y_test)})
             timer = time.time() - start_time
             cart_runtime.append(timer)
 
         # Random Forest -----
         if rf:
             start_time = time.time()
-            forest = RandomForestClassifier(n_estimators = 100, max_features='auto', random_state=100)
-            forest.fit(X_train,y_train)
-            score_forest = forest.score(X_test, y_test)
-            rf_run = {n: score_forest}
-            rf_scores.update(rf_run)
+            rf_scores.update({n: models('rf', X=X_train, y=y_train, Xtest=X_test, ytest=y_test)})
             timer = time.time() - start_time
             rf_runtime.append(timer)
 
         # XGBoost -----
         if xgboost:
             start_time = time.time()
-            xgbooster = XGBClassifier(n_estimators=100,max_depth=4,random_state=100)
-            xgbooster.fit(X_train, y_train)
-            score_xgboost = xgbooster.score(X_test, y_test)
-            xg_run = {n: score_xgboost}
-            xg_scores.update(xg_run)
+            xg_scores.update({n: models('xgboost', X=X_train, y=y_train, Xtest=X_test, ytest=y_test)})
             timer = time.time() - start_time
             xgboost_runtime.append(timer)
 
         # Neural Net -----
         if nn:
             start_time = time.time()
-            nnet = MLPClassifier(solver='adam',
-                                    hidden_layer_sizes=(5,5),
-                                    max_iter = 500,
-                                    early_stopping = True,
-                                    random_state=100)
-
-            nnet.fit(X_train, y_train)
-            score_nnet = nnet.score(X_test, y_test)
-            nn_run = {n: score_nnet}
-            nn_scores.update(nn_run)
+            nn_scores.update({n: models('nn', X=X_train, y=y_train, Xtest=X_test, ytest=y_test)})
             timer = time.time() - start_time
             nn_runtime.append(timer)
 
@@ -156,8 +195,7 @@ def modelBake(_lower,_upper,_step,logreg=True,cart=True,rf=True,xgboost=True,nn=
 
     return(model_accuracies)
 
-
-model_accuracies = modelBake(1000,9000,100)
+model_accuracies = modelBake(1000,9000,100, data=class_data, test_size=1000)
 
 print('Model Accuracies')
 print('-----------------')
@@ -172,3 +210,55 @@ plt.plot(model_accuracies['cart_runtime'], label='cart')
 plt.plot(model_accuracies['rf_runtime'], label='rf')
 plt.plot(model_accuracies['xgboost_runtime'], label='xgboost')
 plt.plot(model_accuracies['nn_runtime'], label='nn')
+
+# ==============================================================
+
+# Bake-Off: Gain point estimates of model Accuracy
+
+# Dataset: Random number of features
+np.random.seed(1)
+seeds = np.random.choice(range(1000000), 1000, replace=False)
+
+datalist = {}
+for n in range(1000):
+    np.random.seed(seeds[n])
+    sampsize = int(np.random.randint(500,10000,1))
+    _nfeatures = int(np.random.randint(20,300,1))
+
+    class_data = make_classification(
+        n_samples = sampsize,
+        n_features = _nfeatures,
+        n_informative = int(0.2*_nfeatures),
+        n_redundant = 2,
+        class_sep = 2,
+        flip_y = 0.1,
+        weights=[0.5,0.5],
+        random_state=100)
+    datalist.update({n: class_data})
+
+data_size = len(datalist[0][1])
+
+logreg_scores = {}
+cart_scores = {}
+rf_scores = {}
+xg_scores = {}
+nn_scores = {}
+for n in range(10):
+    TrainTestData = test_setup(_test_size=0.2, _data=datalist[n])
+    X_train = TrainTestData['X_training']
+    y_train = TrainTestData['y_training']
+    X_test = TrainTestData['X_test']
+    y_test = TrainTestData['y_test']
+
+    cart_scores.update({n: models('cart', X=X_train, y=y_train, Xtest=X_test, ytest=y_test)})
+    logreg_scores.update({n: models('logreg', X=X_train, y=y_train, Xtest=X_test, ytest=y_test)})
+    cart_scores.update({n: models('cart', X=X_train, y=y_train, Xtest=X_test, ytest=y_test)})
+    rf_scores.update({n: models('rf', X=X_train, y=y_train, Xtest=X_test, ytest=y_test)})
+    xg_scores.update({n: models('xgboost', X=X_train, y=y_train, Xtest=X_test, ytest=y_test)})
+    nn_scores.update({n: models('nn', X=X_train, y=y_train, Xtest=X_test, ytest=y_test)})
+
+np.average(list(logreg_scores.values()))
+np.average(list(cart_scores.values()))
+np.average(list(rf_scores.values()))
+np.average(list(xg_scores.values()))
+np.average(list(nn_scores.values()))
