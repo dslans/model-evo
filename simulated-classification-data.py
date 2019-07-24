@@ -101,7 +101,7 @@ def models(type='logreg', X=None, y=None, Xtest=None, ytest=None):
         return(score_nnet)
 
 
-def modelBake(_lower,_upper,_step,data, test_size=0.2, logreg=True,cart=True,rf=True,xgboost=True,nn=True):
+def modelPerformanceSamples(_lower,_upper,_step,data, test_size=0.2, logreg=True,cart=True,rf=True,xgboost=True,nn=True):
 
     TrainTestData = test_setup(test_size, data)
     X_training = TrainTestData['X_training']
@@ -195,7 +195,7 @@ def modelBake(_lower,_upper,_step,data, test_size=0.2, logreg=True,cart=True,rf=
 
     return(model_accuracies)
 
-model_accuracies = modelBake(1000,9000,100, data=class_data, test_size=1000)
+model_accuracies = modelPerformanceSamples(1000,9000,100, data=class_data, test_size=1000)
 
 print('Model Accuracies')
 print('-----------------')
@@ -215,50 +215,72 @@ plt.plot(model_accuracies['nn_runtime'], label='nn')
 
 # Bake-Off: Gain point estimates of model Accuracy
 
-# Dataset: Random number of features
-np.random.seed(1)
-seeds = np.random.choice(range(1000000), 1000, replace=False)
+def modelPerformanceBake(rounds):
+    # Dataset: Random number of features
+    np.random.seed(1)
+    seeds = np.random.choice(range(1000000), rounds, replace=False)
 
-datalist = {}
-for n in range(1000):
-    np.random.seed(seeds[n])
-    sampsize = int(np.random.randint(500,10000,1))
-    _nfeatures = int(np.random.randint(20,300,1))
+    datalist = {}
+    for n in range(rounds):
+        np.random.seed(seeds[n])
+        sampsize = int(np.random.randint(500,10000,1))
+        _nfeatures = int(np.random.randint(20,300,1))
 
-    class_data = make_classification(
-        n_samples = sampsize,
-        n_features = _nfeatures,
-        n_informative = int(0.2*_nfeatures),
-        n_redundant = 2,
-        class_sep = 2,
-        flip_y = 0.1,
-        weights=[0.5,0.5],
-        random_state=100)
-    datalist.update({n: class_data})
+        class_data = make_classification(
+            n_samples = sampsize,
+            n_features = _nfeatures,
+            n_informative = int(0.2*_nfeatures),
+            n_redundant = 2,
+            class_sep = 2,
+            flip_y = 0.1,
+            weights=[0.5,0.5],
+            random_state=100)
+        datalist.update({n: class_data})
 
-data_size = len(datalist[0][1])
+    data_size = len(datalist[0][1])
 
-logreg_scores = {}
-cart_scores = {}
-rf_scores = {}
-xg_scores = {}
-nn_scores = {}
-for n in range(10):
-    TrainTestData = test_setup(_test_size=0.2, _data=datalist[n])
-    X_train = TrainTestData['X_training']
-    y_train = TrainTestData['y_training']
-    X_test = TrainTestData['X_test']
-    y_test = TrainTestData['y_test']
+    logreg_scores = []
+    cart_scores = []
+    rf_scores = []
+    xg_scores = []
+    nn_scores = []
+    for n in range(rounds):
+        TrainTestData = test_setup(_test_size=0.2, _data=datalist[n])
+        X_train = TrainTestData['X_training']
+        y_train = TrainTestData['y_training']
+        X_test = TrainTestData['X_test']
+        y_test = TrainTestData['y_test']
 
-    cart_scores.update({n: models('cart', X=X_train, y=y_train, Xtest=X_test, ytest=y_test)})
-    logreg_scores.update({n: models('logreg', X=X_train, y=y_train, Xtest=X_test, ytest=y_test)})
-    cart_scores.update({n: models('cart', X=X_train, y=y_train, Xtest=X_test, ytest=y_test)})
-    rf_scores.update({n: models('rf', X=X_train, y=y_train, Xtest=X_test, ytest=y_test)})
-    xg_scores.update({n: models('xgboost', X=X_train, y=y_train, Xtest=X_test, ytest=y_test)})
-    nn_scores.update({n: models('nn', X=X_train, y=y_train, Xtest=X_test, ytest=y_test)})
+        logreg_scores.append(models('logreg', X=X_train, y=y_train, Xtest=X_test, ytest=y_test))
+        cart_scores.append(models('cart', X=X_train, y=y_train, Xtest=X_test, ytest=y_test))
+        rf_scores.append(models('rf', X=X_train, y=y_train, Xtest=X_test, ytest=y_test))
+        xg_scores.append(models('xgboost', X=X_train, y=y_train, Xtest=X_test, ytest=y_test))
+        nn_scores.append(models('nn', X=X_train, y=y_train, Xtest=X_test, ytest=y_test))
 
-np.average(list(logreg_scores.values()))
-np.average(list(cart_scores.values()))
-np.average(list(rf_scores.values()))
-np.average(list(xg_scores.values()))
-np.average(list(nn_scores.values()))
+    model_scores = {
+    'logreg': logreg_scores,
+    'cart': cart_scores,
+    'rf': rf_scores,
+    'xgboost': xg_scores,
+    'nn': nn_scores
+    }
+    return(model_scores)
+
+bakeOff = modelPerformanceBake(1000)
+
+print('Avg Model Accuracies')
+print('----------------------')
+print('Logistic Regression: {:.3f}'.format(np.average(bakeOff['logreg'])))
+print('CART: {:.3f}'.format(np.average(bakeOff['cart'])))
+print('Random Forest: {:.3f}'.format(np.average(bakeOff['rf'])))
+print('XGBoost: {:.3f}'.format(np.average(bakeOff['xgboost'])))
+print('Neural Net: {:.3f}'.format(np.average(bakeOff['nn'])))
+
+bakedAccuracies = [bakeOff['logreg'], bakeOff['cart'], bakeOff['rf'],
+    bakeOff['xgboost'], bakeOff['nn']]
+
+# Plot the accuracy data from bake-off
+plt.figure(figsize=(10,10))
+plt.boxplot(bakedAccuracies, labels=['LR','CART','RF','XGB','NN'])
+plt.ylabel('Accuracy')
+plt.title('Predictive Accuracy of Models')
